@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OCT external manifest (Draft v0.3)",
+  "description": "An external manifest: an array of catalog entries, each wrapping an OCT tool array with the image it applies to. See container-tool-manifest-spec.md §4c.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/catalogEntry" },
+  "$defs": {
+    "catalogEntry": {
+      "type": "object",
+      "required": ["image", "tag", "tools"],
+      "properties": {
+        "image": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "source": { "type": "string", "format": "uri" },
+        "secrets": {
+          "type": "array",
+          "items": { "$ref": "oct-0.3.schema.json#/$defs/secretItem" }
+        },
+        "tools": { "$ref": "oct-0.3.schema.json" }
+      }
+    }
+  }
+}

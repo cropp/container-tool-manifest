@@ -1,0 +1,4 @@
+{
+  // Tables cannot be wrapped in Markdown; exempt them from line length.
+  "MD013": { "tables": false }
+}

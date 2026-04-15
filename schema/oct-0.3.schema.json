@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OCT tool array (Draft v0.3)",
+  "description": "Value of the com.teamropp.oct image label: an array of OCT tool objects. See container-tool-manifest-spec.md §2. Unknown fields are allowed and ignored by dispatchers (spec §2, Compatibility and Unknown Fields). Tool names must be unique within the array; JSON Schema cannot check this.",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/tool" },
+  "$defs": {
+    "toolName": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "paramName": {
+      "description": "Becomes a property name in the LLM tool definition. \"input\" is reserved for the primary input (spec §2).",
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+      "not": { "const": "input" }
+    },
+    "flag": {
+      "type": "string",
+      "pattern": "^--?[A-Za-z0-9][A-Za-z0-9-]*$"
+    },
+    "envVarName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "mediaType": {
+      "type": "string",
+      "pattern": "^(\\*|[a-z0-9][a-z0-9!#$&^_.+-]*)/(\\*|[a-z0-9][a-z0-9!#$&^_.+-]*)$"
+    },
+    "tool": {
+      "type": "object",
+      "required": ["schema", "name", "description", "since", "input", "output"],
+      "properties": {
+        "schema": {
+          "description": "MAJOR.MINOR. Tools written to this draft use \"0.3\".",
+          "type": "string",
+          "pattern": "^0\\.[0-9]+$"
+        },
+        "name": { "$ref": "#/$defs/toolName" },
+        "description": { "type": "string", "minLength": 1 },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "since": { "type": "string", "minLength": 1 },
+        "deprecated": { "type": "boolean", "default": false },
+        "replacedBy": { "$ref": "#/$defs/toolName" },
+        "args": {
+          "description": "Fixed arguments passed after the image reference and before parameters (spec §2).",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "input": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["stdin", "file", "none"] },
+            "description": { "type": "string" },
+            "mediaType": { "$ref": "#/$defs/mediaType" },
+            "path": {
+              "description": "Experimental (spec §3). A single file name directly under /in.",
+              "type": "string",
+              "pattern": "^/in/[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+            },
+            "flag": { "$ref": "#/$defs/flag" }
+          },
+          "if": { "properties": { "type": { "const": "file" } } },
+          "then": { "required": ["path"] },
+          "else": {
+            "not": { "anyOf": [{ "required": ["path"] }, { "required": ["flag"] }] }
+          }
+        },
+        "output": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["stdout", "file", "none"] },
+            "description": { "type": "string" },
+            "mediaType": { "$ref": "#/$defs/mediaType" },
+            "path": {
+              "description": "Experimental (spec §3). A single file name directly under /out.",
+              "type": "string",
+              "pattern": "^/out/[A-Za-z0-9_-][A-Za-z0-9._-]*$"
+            },
+            "flag": { "$ref": "#/$defs/flag" }
+          },
+          "if": { "properties": { "type": { "const": "file" } } },
+          "then": { "required": ["path"] },
+          "else": {
+            "not": { "anyOf": [{ "required": ["path"] }, { "required": ["flag"] }] }
+          }
+        },
+        "params": { "type": "array", "items": { "$ref": "#/$defs/param" } },
+        "secrets": { "$ref": "#/$defs/toolSecrets" },
+        "exec": { "$ref": "#/$defs/exec" },
+        "examples": { "type": "array", "items": { "$ref": "#/$defs/example" } }
+      }
+    },
+    "param": {
+      "type": "object",
+      "required": ["name", "flag", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/paramName" },
+        "flag": { "$ref": "#/$defs/flag" },
+        "type": { "enum": ["string", "integer", "float", "boolean", "enum"] },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "default": true,
+        "required": { "type": "boolean", "default": false },
+        "description": { "type": "string" }
+      },
+      "if": { "properties": { "type": { "const": "enum" } } },
+      "then": { "required": ["enum"] },
+      "else": { "not": { "required": ["enum"] } }
+    },
+    "secretItem": {
+      "description": "Manifests may only declare source \"env\" (spec §5a). Other backends are bound in user-scope config.",
+      "type": "object",
+      "required": ["name", "source", "key"],
+      "properties": {
+        "name": { "$ref": "#/$defs/envVarName" },
+        "source": { "const": "env" },
+        "key": { "$ref": "#/$defs/envVarName" },
+        "required": { "type": "boolean", "default": false },
+        "default": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "toolSecrets": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "mode": { "enum": ["append", "replace"], "default": "append" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/secretItem" } }
+      }
+    },
+    "exec": {
+      "description": "Runtime needs only. There is deliberately no command field (spec §7a).",
+      "type": "object",
+      "properties": {
+        "network": { "type": "boolean", "default": false },
+        "workdir": { "type": "string", "pattern": "^/" },
+        "notes": { "type": "string" }
+      }
+    },
+    "example": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "input": { "type": "string" },
+        "params": { "type": "object" },
+        "output": { "type": "string" }
+      }
+    }
+  }
+}
